@@ -12,6 +12,7 @@ setup(
         'scipy',
         'scikit-learn',
         'joblib'
+        'dill'
     ],
     entry_points={
         'console_scripts': [
