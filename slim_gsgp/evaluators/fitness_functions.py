@@ -142,3 +142,76 @@ def r2_score(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     ss_tot = torch.sum(torch.square(y_true - torch.mean(y_true)))
     r2 = 1 - (ss_res / ss_tot)
     return r2
+
+"""
+---
+Classification fitness functions (multiclass SLIM-GSGP)
+y_true: integer labels (n,) in 0..K-1 ; y_pred: logit matrix (n, K). All are minimised.
+---
+"""
+
+def cross_entropy(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+    """
+    Mean multiclass cross-entropy (softmax + negative log-likelihood) computed from logits.
+
+    Parameters
+    ----------
+    y_true : torch.Tensor
+        Integer class labels, shape (n,).
+    y_pred : torch.Tensor
+        Logits, shape (n, K).
+
+    Returns
+    -------
+    torch.Tensor
+        Cross-entropy value (to minimise).
+    """
+    return torch.nn.functional.cross_entropy(y_pred, y_true.long())
+
+
+def macro_f1_loss(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+    """
+    1 - macro-F1 of the argmax predictions. Classes are those present in y_true or in the
+    predictions (same convention as sklearn's f1_score(average="macro", zero_division=0)).
+
+    Parameters
+    ----------
+    y_true : torch.Tensor
+        Integer class labels, shape (n,).
+    y_pred : torch.Tensor
+        Logits, shape (n, K).
+
+    Returns
+    -------
+    torch.Tensor
+        1 - macro-F1 (to minimise).
+    """
+    y_true = y_true.long()
+    pred = torch.argmax(y_pred, dim=1)
+    f1s = []
+    for k in torch.unique(torch.cat([y_true, pred])):
+        tp = torch.sum((pred == k) & (y_true == k)).float()
+        fp = torch.sum((pred == k) & (y_true != k)).float()
+        fn = torch.sum((pred != k) & (y_true == k)).float()
+        denom = 2 * tp + fp + fn
+        f1s.append(2 * tp / denom if denom > 0 else torch.tensor(0.0))
+    return 1 - torch.stack(f1s).mean()
+
+
+def error_rate(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+    """
+    1 - accuracy of the argmax predictions.
+
+    Parameters
+    ----------
+    y_true : torch.Tensor
+        Integer class labels, shape (n,).
+    y_pred : torch.Tensor
+        Logits, shape (n, K).
+
+    Returns
+    -------
+    torch.Tensor
+        Error rate (to minimise).
+    """
+    return 1 - torch.mean((torch.argmax(y_pred, dim=1) == y_true.long()).float())
